@@ -1,0 +1,198 @@
+-- ======================================================
+-- FamilyNest Phase 0 Locked Schema (Updated)
+-- Reflects current Supabase state as of now
+-- ======================================================
+
+-- EXTENSIONS
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";      -- for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";     -- for uuid_generate_v4()
+
+-- ======================================================
+-- TABLES
+-- ======================================================
+
+-- app_settings
+CREATE TABLE IF NOT EXISTS public.app_settings (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_email text NOT NULL
+);
+
+-- profiles
+CREATE TABLE IF NOT EXISTS public.profiles (
+    user_id uuid PRIMARY KEY,
+    email text NOT NULL,
+    display_name text,
+    avatar_url text,
+    role text,
+    dob date,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+-- items
+CREATE TABLE IF NOT EXISTS public.items (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    kind text NOT NULL,
+    author_id uuid,
+    author_email text NOT NULL,
+    visibility text DEFAULT 'all',
+    body text,
+    media_urls text[],
+    parent_id uuid,
+    start_at timestamptz,
+    end_at timestamptz,
+    data jsonb DEFAULT '{}'::jsonb,
+    is_deleted boolean DEFAULT false,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+-- interactions
+CREATE TABLE IF NOT EXISTS public.interactions (
+    item_id uuid NOT NULL,
+    user_email text NOT NULL,
+    type text NOT NULL,
+    answer_index integer,
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (item_id, user_email, type)
+);
+
+-- quiz_questions
+CREATE TABLE IF NOT EXISTS public.quiz_questions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    question_text text NOT NULL,
+    options text[] NOT NULL,
+    order_index integer NOT NULL
+);
+
+-- quiz_answers
+CREATE TABLE IF NOT EXISTS public.quiz_answers (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid,
+    question_id uuid,
+    answer_index integer NOT NULL,
+    locked_at timestamptz DEFAULT now()
+);
+
+-- quiz_guesses
+CREATE TABLE IF NOT EXISTS public.quiz_guesses (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    guesser_id uuid,
+    target_id uuid,
+    question_id uuid,
+    guessed_index integer NOT NULL,
+    created_at timestamptz DEFAULT now()
+);
+
+-- reflections
+CREATE TABLE IF NOT EXISTS public.reflections (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid,
+    mood_emoji text NOT NULL,
+    reflection_text text,
+    week_start date NOT NULL,
+    created_at timestamptz DEFAULT now()
+);
+
+-- scenario_questions
+CREATE TABLE IF NOT EXISTS public.scenario_questions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    question_text text NOT NULL,
+    options text[] NOT NULL,
+    correct_index integer NOT NULL,
+    order_index integer NOT NULL,
+    category text
+);
+
+-- scenario_answers
+CREATE TABLE IF NOT EXISTS public.scenario_answers (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid,
+    question_id uuid,
+    chosen_index integer NOT NULL,
+    created_at timestamptz DEFAULT now()
+);
+
+-- ======================================================
+-- RLS ENABLE
+-- ======================================================
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_guesses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reflections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_answers ENABLE ROW LEVEL SECURITY;
+
+-- ======================================================
+-- POLICIES (example placeholders, refine as needed)
+-- ======================================================
+-- Profiles: users manage their own profile
+CREATE POLICY "profiles_self" ON public.profiles
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id);
+
+-- Items: users manage their own posts
+CREATE POLICY "items_self" ON public.items
+    FOR ALL TO authenticated
+    USING (author_id = auth.uid());
+
+-- Interactions: users manage their own interactions
+CREATE POLICY "interactions_self" ON public.interactions
+    FOR ALL TO authenticated
+    USING (user_email = auth.email());
+
+-- Quiz, reflections, scenarios: placeholder policies
+-- Adjust per your real needs
+CREATE POLICY "quiz_answers_self" ON public.quiz_answers
+    FOR ALL TO authenticated
+    USING (user_id = auth.uid());
+
+CREATE POLICY "quiz_guesses_self" ON public.quiz_guesses
+    FOR ALL TO authenticated
+    USING (guesser_id = auth.uid());
+
+CREATE POLICY "reflections_self" ON public.reflections
+    FOR ALL TO authenticated
+    USING (user_id = auth.uid());
+
+CREATE POLICY "scenario_answers_self" ON public.scenario_answers
+    FOR ALL TO authenticated
+    USING (user_id = auth.uid());
+
+-- ======================================================
+-- GRANTS
+-- ======================================================
+-- 👉 Paste here the full block of GRANT statements you already exported.
+
+
+-- ======================================================
+-- islamic_questions (NEW TABLE)
+-- ======================================================
+CREATE TABLE IF NOT EXISTS public.islamic_questions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    question_text text NOT NULL,
+    options text[] NOT NULL,              -- e.g. {Yes,No}, {Good,Bad,Neutral}
+    correct_index integer,                -- can be null if opinion-based
+    explanation_correct text,             -- shown if correct
+    explanation_incorrect text,           -- shown if incorrect
+    order_index integer NOT NULL,         -- rotation order
+    category text,                        -- Life, Faith, Creation, Respect, Behavior
+    created_at timestamptz DEFAULT now()
+);
+
+-- ======================================================
+-- RLS ENABLE
+-- ======================================================
+ALTER TABLE public.islamic_questions ENABLE ROW LEVEL SECURITY;
+
+-- ======================================================
+-- POLICIES
+-- ======================================================
+CREATE POLICY "islamic_questions_read" ON public.islamic_questions
+    FOR SELECT TO authenticated
+    USING (true);
+
