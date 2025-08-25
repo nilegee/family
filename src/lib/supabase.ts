@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
+import { env } from '$env/dynamic/public'
 
 export type Json =
   | string
@@ -394,4 +394,7 @@ export interface Database {
   }
 }
 
-export const supabase = createClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY)
+const url = env.PUBLIC_SUPABASE_URL ?? ''
+const anonKey = env.PUBLIC_SUPABASE_ANON_KEY ?? ''
+
+export const supabase = createClient<Database>(url, anonKey)
